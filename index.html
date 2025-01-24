@@ -1,0 +1,161 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<script src="Resources/prototype1602packer.js" type="text/javascript" charset="utf-8">
+</script>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<title>Chat with PHP and Prototype.js</title>
+<meta name="generator" content="Freeway 5 Pro 5.1.1"/>
+<style type="text/css">
+<!-- 
+body { margin:0px; background-color:#fff; height:100% }
+html { height:100% }
+form { margin:0px }
+img { margin:0px; border-style:none }
+button { margin:0px; border-style:none; padding:0px; background-color:transparent; vertical-align:top }
+p:first-child { margin-top:0px }
+table { empty-cells:hide }
+.f-sp { font-size:1px; visibility:hidden }
+.f-lp { margin-bottom:0px }
+.f-fp { margin-top:0px }
+.f-x1 {  }
+.f-x2 {  }
+.f-x3 {  }
+#posts td.author { width:70px; text-align:right; border-right: 1px solid #e3e3e3;}
+em { font-style:italic }
+h1 { font-family:Verdana,Trebuchet MS,Geneva,Arial,sans-serif; font-weight:bold; font-size:24px }
+h1:first-child { margin-top:0px }
+h2 { font-weight:bold; font-size:16px }
+h2:first-child { margin-top:0px }
+h3 { font-weight:bold; font-size:14px }
+h3:first-child { margin-top:0px }
+strong { font-weight:bold }
+.style3 { font-family:Verdana,Trebuchet MS,Geneva,Arial,sans-serif; font-size:12px }
+#message { width:619px; border: 1px solid #666;}
+#message.safari { border-color: #6dc4ff; border-width: 2px; margin-top: -1px; margin-left: -1px;}
+#posts table { width: 100%; }
+#posts td { vertical-align: top; padding: 4px; border-top: 1px solid #eee;}
+#posts td p { margin-bottom: 0;}
+#posts td pre { margin: 0; width: 600px; overflow: auto;}
+tr.bot { background-color:#d9e7fb; font-size:11px;}
+tr.me { background-color:#ffc; font-style: bold;}
+-->
+</style>
+<!--[if lt IE 7]>
+<link rel="stylesheet" type="text/css" href="css/ie6.css"/>
+<![endif]-->
+<script type="text/javascript">//<![CDATA[
+var fixScroll = function(){
+	var p = $('posts');
+	var bottom = p.scrollHeight - 50; //experiment with this threshold
+	console.log(bottom);
+	p.scrollTop = (p.scrollTop > p.getHeight() && (p.scrollTop + p.getHeight()) > bottom) ? p.scrollHeight : p.scrollTop;
+}
+
+document.observe('dom:loaded', function(evt){
+	if(!Prototype.Browser.WebKit) $('message').addClassName('safari');
+	var insert = function(input, theText) {
+		if(typeof input.selectionStart != 'undefined'){
+			var start = input.selectionStart;
+			var end = input.selectionEnd;
+			input.value = input.value.substr(0, start) + theText + input.value.substr(end);
+			input.selectionStart = start + theText.length;
+			input.selectionEnd = start + theText.length;
+			input.focus();
+		}
+	}
+	
+	var keyDownHandler = function (e){
+		//tabs work again
+		var elm = Event.element(e);
+		switch (e.keyCode) {
+			case Event.KEY_RETURN:
+			case 3:
+				Event.stop(e);
+				$('chat').fire('my:Submit');
+				break;
+			case Event.KEY_TAB:
+			case 9:
+				Event.stop(e);
+				var cacheScrollTop = elm.scrollTop;
+				setTimeout(function(){insert(elm, unescape('%09'))},0);
+				setTimeout(function(){elm.scrollTop = cacheScrollTop}, 10);
+				break;
+		}
+	}
+	$('message').observe('keydown', keyDownHandler);
+
+
+	var getUser = function(e){
+	    if($('user').value == ''){
+			Event.stop(e);
+	        $('user').value = window.prompt('What\'s your name?');
+	        if($('user').value.length > 0) {
+				$('chat').request({parameters:{'message':$('user').value + ' has entered the room','user':'-'},
+						onComplete:function(){pollChat(); $('posts').scrollTop = $('posts').scrollHeight;}
+				});
+			}
+	    }
+	}
+	var pollChat = function(){
+	    new Ajax.Updater($('posts').down('table'),'chat.php',{
+	        parameters:{
+	            latest:$('latest').value,
+				last:$('last').value,
+				user:$('user').value
+	        },
+	        insertion:'bottom',
+	        evalScripts:true,
+	        onComplete:function(){fixScroll.defer();}
+	    });
+	}
+	$('posts').update('<table cellspacing="0"></table>');
+	pollChat();
+	$('message').observe('focus',getUser);
+	$('message').activate();
+	new PeriodicalExecuter(pollChat,3);
+	document.observe('my:Submit',function(evt){
+	    evt.stop();
+		var m = $('message').value;
+		var l = $('latest').value;
+		if(m.match(/(\r|\n)/)) m = '<pre><code>' + m.escapeHTML() + '</code></pre>';
+	    $('chat').request({parameters:{'message':m,'latest':l},onComplete:function(transport){
+	        $('posts').down('table').insert({bottom:transport.responseText});
+	        setTimeout(fixScroll,1)
+	}
+	    }); 
+	    setTimeout(function(){$('message').clear().focus()},1);
+	});
+
+	$('chat').observe('submit',function(evt){
+		Event.stop(evt);
+	    $('chat').fire('my:Submit');
+	});
+	$('speak').observe('click',function(evt){
+		Event.stop(evt);
+		$('chat').fire('my:Submit');
+	});
+
+});
+//]]></script>
+</head>
+<body>
+<div id="PageDiv" style="position:relative; min-height:100%">
+	<form action="chat.php" method="post" id="chat">
+	<input type="hidden" name="user" id="user"/>
+	<input type="hidden" name="last" id="last"/>	<input type="hidden" name="latest" id="latest" value=""/>
+	<div id="item1" class="f-x2" style="position:absolute; left:0px; top:0px; right:0px; z-index:1; padding-left:30px; padding-top:18px; padding-bottom:18px; background-color:#cfc; overflow:visible">
+		<h1 class="f-lp">Chat.app</h1>
+	</div>
+	<div id="posts" class="style3" style="position:absolute; left:32px; top:83px; width:706px; height:234px; z-index:2; border:solid #999 1px; overflow:scroll">
+		<p class="f-lp">Chat transcript.</p>
+	</div>
+	<div id="item3" style="position:absolute; left:32px; top:333px; width:706px; height:33px; z-index:3; overflow:visible">
+		<p class="f-lp"><textarea name="message" id="message" rows="5" cols="30"></textarea> <input type="submit" name="speak" value="Post" id="speak"/></p>
+
+	</div>
+	<div>
+	</div></form>
+</div>
+</body>
+</html>
